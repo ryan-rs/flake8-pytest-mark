@@ -1,4 +1,4 @@
-.PHONY: clean clean-test clean-pyc clean-build clean-venv check-venv help
+.PHONY: clean clean-test clean-pyc clean-build clean-venv check-venv help install-editable
 .DEFAULT_GOAL := help
 
 SHELL := /bin/bash
@@ -60,28 +60,35 @@ clean-test: ## remove test and coverage artifacts
 clean-venv: check-venv ## remove all packages from current virtual environment
 	@source virtualenvwrapper.sh && wipeenv || echo "Skipping wipe of environment"
 
-lint: ## check style with flake8
+lint: clean install-dev-requirements ## check style with flake8
 	flake8 pytest-mark-checker tests
 
-test: ## run tests quickly with the default Python
-	python setup.py install
+test: develop ## run tests quickly with the default Python
 	py.test
 
 test-all: ## run tests on every Python version with tox
 	tox
 
-release: clean ## package and upload a release
-	python setup.py sdist upload
-	python setup.py bdist_wheel upload
+release: lint install test bumpversion publish ## package and upload a release
+	echo 'Successfully released!'
+	echo 'Please push the newly created tag and commit to GitHub.'
 
-dist: clean ## builds source and wheel package
-	python setup.py sdist
-	python setup.py bdist_wheel
-	ls -l dist
+install: clean build clean-venv ## install the package to the active Python's site-packages
+	pip install dist/*.whl
 
-install: clean ## install the package to the active Python's site-packages
-	python setup.py install
+install-editable: ## install the package in editable mode
+	if pip list -e | grep 'flake8-pytest-mark'; then echo 'Editable package already installed'; else pip install -e .; fi
 
-develop: clean ## install necessary packages to setup a dev environment
+install-dev-requirements: ## install the requirements for development
 	pip install -r requirements_dev.txt
-	pip install -e .
+
+develop: clean install-dev-requirements install-editable ## install necessary packages to setup a dev environment
+
+build: ## build a wheel
+	python setup.py bdist_wheel
+
+publish: ## publish package to PyPI
+	twine upload dist/*.whl
+
+bumpversion: ## bumps the version of by major, minor, or patch
+	bumpversion ${BUMP} || { echo 'You must set the ENV BUMP= major, minor, patch' ; exit 1; }
